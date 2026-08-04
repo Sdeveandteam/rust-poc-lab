@@ -1,0 +1,5 @@
+/target/
+/lab_test_folder/
+*.pem
+*.bin
+*.key
