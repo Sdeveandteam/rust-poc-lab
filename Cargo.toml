@@ -1,12 +1,12 @@
 [package]
-name = "rust_poc_lab"
+name = "rust_lab_poc" # sesuaikan dengan nama project Anda
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 chacha20poly1305 = "0.10"
-rsa = "0.9"
 rand = "0.8"
-walkdir = "2"
+rsa = "0.9"
 sha2 = "0.10"
-
+walkdir = "2.4"
+tiny_http = "0.12"
